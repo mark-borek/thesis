@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <script src='https://d3js.org/d3.v5.min.js'></script>
+  <script async="" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+  <style>
+    body { 
+      font-family: "Bookman Old Style";
+      font-size: 12px;
+      margin: 0;
+      background-color: antiquewhite;
+    }
+  </style>
+</head>
+
+
+<!-- Mark Borek Thesis Project 2020--> 
+
+
+<body>
+    <h1 class="header" width="2000" style="text-align: center; font-size: 32px;">Coronavirus Tweets and Trends</h1>
+    <h3 class="header" width="2000" style="text-align: center;">A Thesis project by Mark Borek</h3>
+    <div id='chart' width="100%" height="1000px" style=""></div>
+    
+<script>
+// Creates bubble chart 
+function bubbleChart() {
+  const width = 2000;
+  const height = 1500;
+
+  // location to center the bubbles
+  const center = { x: width/2, y: height/2 };
+
+  // strength of the forces
+  const forceStrength = 0.005;
+
+  // variable declarations
+  let svg = null;
+  let bubbles = null;
+  let labels = null;
+  let nodes = [];
+
+  // charge is dependent on size of the bubble, so bigger towards the middle (helps with the shape of the chart)
+  function charge(d) {
+    return Math.pow(d.radius, 2.0) * 0.01
+  }
+
+  // create a force simulation and add forces to it
+  const simulation = d3.forceSimulation()
+    .force('charge', d3.forceManyBody().strength(charge))
+    .force('center', d3.forceCenter(center.x, center.y))
+    .force('x', d3.forceX().strength(forceStrength).x(center.x))
+    .force('y', d3.forceY().strength(forceStrength).y(center.y))
+    .force('collision', d3.forceCollide().radius(d => d.radius));
+
+  // need to wait to start the forces until the nodes are created
+  simulation.stop();
+
+  // set up colour scale
+  const fillColour = d3.scaleOrdinal()
+  	.domain(["1", "2", "3", "5", "99"])
+  	.range(['#2facac','#727bb6','	#484cca','#338fe1','#f95a57','#b2ba35','#f68235','#bf66c6','#ffaff5','#d00707','#ffe244']);
+    //["#0074D9", "#7FDBFF", "#39CCCC", "#3D9970", "#AAAAAA"]
+    
+    
+  /*- function used to create the nodes for the chart
+    - takes data that is loaded using d3.csv in the form of an array of data objects
+    - returns an array of nodes that were created using the data input*/
+  function createNodes(rawData) {
+      
+    // use max size in the data as the max in the scale's domain
+    const maxSize = d3.max(rawData, d => +d.value);
+
+    // size bubbles based on area
+    const radiusScale = d3.scaleSqrt()
+      .domain([0, maxSize])
+      .range([0, 80])
+
+    // use map() to convert raw data into node data
+    const myNodes = rawData.map(d => ({
+      ...d, 
+      size: +d.value,
+      radius: radiusScale(+d.value*3),
+      x: Math.random() * 900,
+      y: Math.random() * 800
+    }))
+
+
+    return myNodes;
+  }
+
+ /*- function that creates svg, bubble, and label elements
+   - takes the container id, and both data object arrays which were loaded by d3.csv*/
+  let chart = function chart(selector, trends, tweets) {
+   
+    // converts data into nodes data
+    nodes = createNodes(trends);
+    
+    //creates zoom variable, which is applied to the svg when it is created  
+    var zoom = d3.zoom()
+        .scaleExtent([0.3,2])
+        .on("zoom", zoomed);
+      
+    //creates label for svg 
+    d3.select(selector)
+      .append("h2")
+      .attr("width", "2000px")
+      .attr("padding","1000px")
+      .style("text-align","center")
+      .text("Click or Drag a topic to populate tweets below. The larger the bubble the more popular the topic. Zoom to see the smaller ones.");
+    
+    // create svg element inside provided selector
+    svg = d3.select(selector)
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height)
+      .attr("transform",'translate(0,0)')
+      .call(zoom)
+
+      //sets the initial zoom scale so that the svg fits in the area provided
+      svg.call(zoom.transform, d3.zoomIdentity.scale(0.65));
+    
+      //function which anchores the svg's x and y position while changing the k value (the zoom scale value)
+      function zoomed(){
+          svg.attr("transform", `translate(${-(document.documentElement.clientWidth*0.25)},${-(document.documentElement.clientHeight/4)}) scale(${d3.event.transform.k})`);
+          
+      }
+ 
+    // bind nodes data to circle elements and sets the d3.drag property on these elements so that the bubbles and labels will be dragged together
+    var elements = svg.selectAll('.bubble')
+      .data(nodes, d => d.trend)
+      .enter()
+      .append('g')
+      .call(d3.drag()
+        .on('start',dragstarted)
+        .on('drag', dragged)
+        .on('end',dragended));
+     
+      
+     
+    bubbles = elements
+      .append('circle')
+      .classed('bubble', true)
+      .attr('r', d => d.radius)
+      .attr('fill', d => fillColour(d.value))
+      .style('opacity','0.6');
+    
+    //font size is determined by the data values which determine each bubble's radius
+    // large bubbles receive larger font. The labels of smaller bubbles are split to fit in the bubble
+    labels = elements
+      .append('text')
+      .style('text-anchor', 'middle')
+      .style('font-size', function(d){
+        if(d.value > 10000){
+            return '1.72em';
+        }
+        else if(d.value < 10000 && d.value > 1000){
+            return '1.1em';
+        }
+        else{
+                return '0.7em';
+            }
+    })
+      .text(function(d){
+            if(d.value < 500){
+                return " ";
+            }
+            if(d.trend.length > d.radius/3.5){
+                let mid = Math.floor(d.trend.length /2);
+                return d.trend.substring(0,mid-2) + "..";
+            }
+            else{
+                return d.trend;
+            }
+            
+        });
+      
+
+    // set simulation's nodes to the created nodes array
+    // simulation starts running automatically once nodes are set
+    simulation.nodes(nodes)
+      .on('tick', ticked)
+      .alpha(1)
+      .restart();
+      
+    // variable whichh will be used to create the embedded tweet objects
+    var twitter; 
+    
+    //functions that determine actions when the bubbles are clicked, dragged, and released  
+    function dragstarted(d) {
+        //restarts the force simulation when the drag begins -- have to reheat (add energy) and restart 
+        simulation.alphaTarget(0.3).restart();
+        
+        //changes x and y values of the bubbles as they are dragged
+        d.fx = d3.event.x;
+        d.fy = d3.event.y;
+        
+        //removes all the tweet elements and the label for the previous topic 
+        d3.selectAll("#tweets").remove();
+        d3.select("#twit").remove();
+        
+        }
+
+        
+      function dragged(d) {
+          //changes x and y values of the bubbles as they are dragged
+          d.fx = d3.event.x;
+          d.fy = d3.event.y;       
+           
+        }
+
+    function dragended(d) {
+        
+        //cools the force simulation
+        simulation.alphaTarget(0);
+        
+        /*  - function that returns a list of url strings for popular tweets related to the topic selected in the bubble
+          - parameter is the data object loaded from the coronaTweets.csv file 
+          - filters out bad words from a list 
+          - the returned array contains only tweets that have certain amount of retweets, likes, or replies (>1000,>500,>100)
+          - does this in sequential order so that the most popular tweets are at the top of the returned array */
+        function url(input){
+            let urlList = [];
+            let badWords = ['fuck','shit','piss','sex','hookup','ass','bitch'];
+            for(i=0;i<input.length;i++){
+                let bool = false;
+                if(d.trend == input[i].trend){
+                    if(input[i].retweets > 1000 || input[i].likes > 1000 || input[i].replies > 1000){
+                        
+                        
+                        var str = input[i].text.toLowerCase();
+                        for(x=0; x<badWords.length; x++){
+                            if(str.includes(badWords[x]))
+                                bool = true;
+                        }
+                        if(bool == false)
+                            urlList.push('https://twitter.com' + input[i].tweet_url);
+                    }
+                    
+                }
+            }
+            for(i=0;i<input.length;i++){
+                let bool = false;
+                if(d.trend == input[i].trend){
+                    if(input[i].retweets > 500 || input[i].likes > 500 || input[i].replies > 500){
+                        var str = input[i].text.toLowerCase();
+                        for(x=0; x<badWords.length; x++){
+                            if(str.includes(badWords[x]))
+                                bool = true;
+                        }
+                        if(bool == false)
+                            urlList.push('https://twitter.com' + input[i].tweet_url);
+                    }
+                    
+                }
+            }
+            for(i=0;i<input.length;i++){
+                let bool = false;
+                if(d.trend == input[i].trend){
+                    if(input[i].retweets > 100 || input[i].likes > 100 || input[i].replies > 100){
+                        var str = input[i].text.toLowerCase();
+                        for(x=0; x<badWords.length; x++){
+                            if(str.includes(badWords[x]))
+                                bool = true;
+                        }
+                        if(bool == false)
+                            urlList.push('https://twitter.com' + input[i].tweet_url);
+                        
+                    }
+                    
+                }
+            }
+            // removes duplicates 
+            let removeDups = [...new Set(urlList)];
+            return removeDups;  
+        }
+    
+        let urlsDisplay = url(tweets);
+
+            d.fx = null;
+            d.fy = null;
+    
+    // creates label for the topic 
+    d3.select("#chart")
+        .append("h1")
+        .text(`Topic: ${d.trend}`)
+        .style("text-align","center")
+        .attr("id","twit");
+     
+    //creates objects that 50 group elements for tweets
+    //not all of these will be necissarily be used depending on the topic selected
+    twitter = d3.select("#chart")
+        .data(new Array(50))
+        .enter()
+        .append("div")
+        .attr("id", "tweets")
+        .style("display","inline-block")
+        .style("vertical-align", "top");
+    
+    /*  creates embeded tweets you have to create a blockquote element and append an a tag inside of it with the urls that were created above*/
+    twitter.append("blockquote")
+        .attr("class", "twitter-tweet")
+        .attr("data-cards","hidden")
+        .attr("data-conversation","none")
+        .append("a")
+        .attr("href", (d,i) => urlsDisplay[i]);
+        
+    //need to append this script from the twitter api to the blockquotes
+    twitter.append("script")
+        .attr("async","async")
+        .attr("src","https://platform.twitter.com/widgets.js")            
+        .attr("charset","utf-8");
+    
+    //uses the twitter api to load all of embeded tweets 
+    //searches for elements to load with the id 'tweets'
+    twttr.widgets.load(document.querySelectorAll("#tweets"));
+            
+    }
+      
+    
+     /* - function called after every tick (multiple ticks per second) of the force simulation
+        - here we do the actual repositioning of the circles based on current x and y value of their bound node data
+        -  x and y values are modified by the force simulation*/
+    function ticked() {
+       bubbles
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y)
+    
+       labels
+        .attr('x', d => d.x)
+        .attr('y', d => d.y);
+       
+    } 
+  }
+
+  
+  return chart;
+}
+
+// new bubble chart instance
+let myBubbleChart = bubbleChart();
+
+/*- function called once promise is resolved and data is loaded from csv
+- passes both the coronaTrends and coronaTweets into the function     
+- calls bubble chart function to display inside #chart div*/
+function display(data) {
+    
+  myBubbleChart('#chart', data[0],data[1]);
+}
+
+/*- Promise.all is used to load both of the .csv files using d3.csv
+- waits until both files are loaded to continue the program --> solves the problem of async loading by waiting to load the page until the data is loaded
+- uses .then to pass the data into the display function */
+Promise.all([
+    d3.csv("coronaTrends.csv"),
+    d3.csv("coronaTweets.csv")
+]).then(display);
+
+</script>
+</body>
