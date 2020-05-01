@@ -354,8 +354,8 @@ function display(data) {
 - waits until both files are loaded to continue the program --> solves the problem of async loading by waiting to load the page until the data is loaded
 - uses .then to pass the data into the display function */
 Promise.all([
-    d3.csv("https://media.githubusercontent.com/media/mark-borek/thesis/master/coronaTrends.csv"),
-    d3.csv("https://media.githubusercontent.com/media/mark-borek/thesis/master/coronaTweets.csv")
+    d3.csv("coronaTrends.csv"),
+    d3.csv("coronaTweets.csv")
 ]).then(display);
 
 </script>
