@@ -355,7 +355,7 @@ function display(data) {
 - uses .then to pass the data into the display function */
 Promise.all([
     d3.csv("coronaTrends.csv"),
-    d3.csv("coronaTweets.csv")
+    d3.csv("https://media.githubusercontent.com/media/mark-borek/thesis/master/coronaTweets.csv")
 ]).then(display);
 
 </script>
